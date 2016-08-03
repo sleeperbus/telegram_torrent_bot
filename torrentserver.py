@@ -13,15 +13,42 @@ class deluge:
     pass 
 
   def reboot(self):
-    os.system("ps ax | grep -vw grep | grep deluged | awk '{print $1}' | xargs kill -9")
+    if self.isAlive(): 
+      self.logger.warn('server still alive, killing forcibly')
+      os.system("ps ax | grep -vw grep | grep deluged | awk '{print $1}' | xargs kill -9")
 
+    self.logger.info('execute deluge')
     os.system("deluged")
+    self.logger.info('deluge check files')
     os.system("deluge-console 'recheck *'")
+    self.logger.info('deluge resume files')
     os.system("deluge-console 'resume *'")
 
+  def restart(self):
+    if self.isAlive(): 
+      self.logger.warn('server still alive, killing forcibly')
+      os.system("ps ax | grep -vw grep | grep deluged | awk '{print $1}' | xargs kill -9") 
+
+    self.logger.info('execute deluge')
+    os.system("deluged")
+
+  def isAlive(self):
+    self.logger.debug('in isAlive')
+    command = 'ps ax | grep -vw grep | grep deluged'
+    results = os.popen(command).read()
+    if len(results) > 0: 
+      self.logger.debug('server alive')
+      return True 
+    else:
+      self.logger.debug('server dead')
+      return False
   
   # add magnet return hash id
   def add(self, magnet): 
+    if not self.isAlive(): 
+      self.logger.warn('before adding torrent, find server down, will restart')
+      self.restart() 
+
     command = "deluge-console add " + magnet 
     befTorrents = self.ongoing()
     befTorrents = [{'title': t['title'], 'id':t['id']} for t in befTorrents]
@@ -37,23 +64,39 @@ class deluge:
         
   # delete torrent using hash id
   def delete(self, id):
+    if not self.isAlive(): 
+      self.logger.warn('before deleting torrent, find server down, will restart')
+      self.restart() 
+
     command = "deluge-console rm " + id
     os.system(command)
   
   # return torrent download status
   def ongoing(self):
+    if not self.isAlive(): 
+      self.logger.warn('before checking torrent, find server down, will restart')
+      self.restart() 
+
     command = "deluge-console info"
     info = os.popen(command).read()
     return self.parse(info)
 
   # deluge-console info id
   def torrentInfoStr(self, id):
+    if not self.isAlive(): 
+      self.logger.warn('before checking torrent, find server down, will restart')
+      self.restart() 
+
     command = "deluge-console info " + id
     info = os.popen(command).read()
     return info
 
   # return torrent info as type of dict
   def torrentInfo(self, id):
+    if not self.isAlive(): 
+      self.logger.warn('before checking torrent, find server down, will restart')
+      self.restart() 
+
     command = "deluge-console info " + id
     info = os.popen(command).read() 
     return self.parse(info)[0] if len(info) != 0 else None
@@ -99,12 +142,3 @@ class deluge:
       parsed.append(torrentInfo)
     return parsed if len(parsed) > 0 else None
 
-
-    
-      
-      
-      
-      
-      
-    
-    

@@ -31,7 +31,7 @@ class T2bot(telepot.helper.ChatHandler):
   def __init__(self, seed_tuple, timeout, search, db, server):
     super(T2bot, self).__init__(seed_tuple, timeout)
     self.logger = logging.getLogger('torrentbot')
-    self.logger.debug('FileClassifier logger init')
+    self.logger.debug('Chatbot logger init')
     self.search = search
     self.server = deluge()
     self.db = db
@@ -52,6 +52,7 @@ class T2bot(telepot.helper.ChatHandler):
   def open(self, initial_msg, seed):
     if not self.db.isUser(self.chat_id):
       self.sender.sendMessage('user_id: %d is not a valid user' % (self.chat_id))
+      self.logger.warn('invalid user %d' % self.chat_id)
       return 
     self.sender.sendMessage('Welcome back')
  
@@ -68,7 +69,9 @@ class T2bot(telepot.helper.ChatHandler):
   def showTorrentsProgress(self):
     ids = self.db.torrentIds(self.chat_id)
     if len(ids) == 0: 
-      self.sender.sendMessage('There is no torrents downloading ...')
+      msg = 'There is no torrents downloading ...'
+      self.sender.sendMessage(msg)
+      self.logger.debug(msg)
     else:
       info = [self.server.torrentInfoStr(id) for id in ids]
       # only torrent exists in server
@@ -89,7 +92,9 @@ class T2bot(telepot.helper.ChatHandler):
     content_type, chat_type, chat_id = telepot.glance(msg) 
     # check valid user
     if not self.db.isUser(chat_id):
-      self.sender.sendMessage('user_id: %d is not a valid user' % (chat_id))
+      msg = 'user_id: %d is not a valid user' % chat_id
+      self.sender.sendMessage(msg)
+      self.logger.warn(msg)
       return 
     
     # always consider text message
@@ -118,10 +123,12 @@ class T2bot(telepot.helper.ChatHandler):
 
       # command - reboot
       elif msg['text'] == '/reboot':
-  	  	self.sender.sendMessage('Torrent server rebooting ...')
-  	  	self.sender.sendMessage('*** Do not enter message ***')
-    		self.server.reboot()
-  	  	self.sender.sendMessage('System ok ...')
+        self.logger.debug('user select reboot option')
+        self.sender.sendMessage('Torrent server rebooting ...')
+        self.sender.sendMessage('*** Do not enter message ***')
+        self.server.reboot()
+        self.sender.sendMessage('System ok ...')
+        self.logger.debug('System reboot done ... ')
 
       # search torrents file using self.search function
       else: 
@@ -131,10 +138,12 @@ class T2bot(telepot.helper.ChatHandler):
           self.bot.editMessageText(id, '...', reply_markup=None)
 
         self.sender.sendMessage('searching ...') 
+        self.logger.debug('user search keyword %s' % msg['text'])
         self.torrents = self.search(unicode(msg['text'])) 
 
         if not len(self.torrents): 
           self.sender.sendMessage('There is no files searched.')
+          self.logger.debug('can not find torrent files ...')
           self.edtTorrents = None
         else: 
           self.showTorrentsMenu(self.torrents)
@@ -168,6 +177,7 @@ class T2bot(telepot.helper.ChatHandler):
     torrentInfo = self.server.add(magnet) 
     if not torrentInfo:
       self.sender.sendMessage('Already in list')
+      self.logger.debug('torrent user add is already in deluge, maybe')
       return
 
     torrentInfo['chat_id'] = self.chat_id
@@ -188,8 +198,9 @@ class JobMonitor(telepot.helper.Monitor):
     self.sched = BackgroundScheduler()
     self.sched.start()
     self.sched.add_job(self.torrentMonitor, 'interval', minutes=3)
+    self.sched.add_job(self.keepAliveTorrentServer, 'interval', minutes=10)
 
-    self.logger.debug('jobmonitor logger init ...')
+    self.logger.debug('JobMonitor logger init ...')
 
   def on_chat_message(self, msg): 
     pass
@@ -198,11 +209,16 @@ class JobMonitor(telepot.helper.Monitor):
     pass
 
   def on_close(self, e):
-    self.logger.debug('jobmonitor will shutdown')
+    self.logger.debug('JobMonitor will shutdown')
     self.shutdown()
    
   def shutdown(self):
     self.sched.shutdown()
+
+  def keepAliveTorrentServer():
+    if not self.server.isAlive():
+      self.logger.warn('Server down, will reboot')
+      self.server.reboot()
 
   def torrentMonitor(self):
     self.logger.debug('========== DB ==========')
@@ -210,6 +226,12 @@ class JobMonitor(telepot.helper.Monitor):
     self.logger.debug(fromDB)
 
     self.logger.debug('========== Server ==========')
+    if not self.server.isAlive():
+      self.logger.warn('checking server completed list, find Server down, will reboot')
+      self.server.reboot()
+    else:
+      self.logger.debug('Torrent server is alived ...')
+      
     fromServer = self.server.completed() 
     self.logger.debug(fromServer)
 

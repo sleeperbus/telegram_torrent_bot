@@ -39,14 +39,12 @@ class FileClassifier(telepot.helper.Monitor):
     self.files = None
     self.folders = None
     self.superUser = superUser
+    self.jobAutoMove = None
 
     self.baseProb = float(baseProb)
     self.autoFileInfo = None
     self.autoSched = BackgroundScheduler()
     self.autoSched.start()
-    self.autoSched.add_job(self.autoClassify, 'interval', hours=1)
-
-    self.autoClassify()
 
     self.kbdYESNO = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -62,9 +60,15 @@ class FileClassifier(telepot.helper.Monitor):
     self.logger.debug('FileClassifier will shutdown')
     self.shutdown()
 
-  def shutdown():
+  def shutdown(self):
     self.autoSched.shutdown()
 
+  def startAutoMove(self):
+    self.jobAutoMove = self.autoSched.add_job(self.autoClassify, 'interval', minutes=1)
+
+  def stopAutoMove(self):
+    self.jobAutoMove.remove()
+    self.jobAutoMove = None
 
   # remove special chars
   def correctPath(self):
@@ -226,6 +230,17 @@ class FileClassifier(telepot.helper.Monitor):
       self.mode = 'move_folder'
       self.folderClassify(chat_id)
 
+    elif msg['text'] == '/start_automove': 
+      if self.jobAutoMove != None:
+        self.bot.sendMessage(chat_id, 'Auto move already on ...')
+      else:
+        self.startAutoMove()
+    elif msg['text'] == '/stop_automove': 
+      if self.jobAutoMove == None:
+        self.bot.sendMessage(chat_id, 'Auto move not started ...')
+      else:
+        self.stopAutoMove() 
+
     elif self.mode == 'create_folder':
       newfolder = msg['text']
 
@@ -239,6 +254,7 @@ class FileClassifier(telepot.helper.Monitor):
       self.mode = 'guess'
       self.fileInfo = None
       self.classify(chat_id)
+
 
   def on_callback_query(self, msg):
     query_id, from_id, data = telepot.glance(msg, flavor='callback_query')

@@ -102,13 +102,8 @@ class FileClassifier(telepot.helper.Monitor):
     return l
 
   def folderList(self):
-    l = []
-    for dirname in os.listdir(self.srcPath):
-      folderInfo = {}
-      folderInfo['srcPath'] = os.path.join(self.srcPath, dirname)
-      folderInfo['name'] = dirname
-      l.append(folderInfo)
-    return l
+	return [{'srcPath':os.path.join(self.srcPath, name), 'name':name} for name in os.listdir(self.srcPath)
+		if os.path.isdir(os.path.join(self.srcPath, name))]
 
   def feeder(self, files):
     if len(files) > 0:

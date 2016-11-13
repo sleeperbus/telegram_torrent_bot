@@ -67,11 +67,10 @@ class T2bot(telepot.helper.ChatHandler):
 
   # Send torrent info string 
   def showTorrentsProgress(self):
-    ids = self.db.torrentIds(self.chat_id)
+    ids = self.db.torrentIds
     if len(ids) == 0: 
       msg = 'There is no torrents downloading ...'
       self.sender.sendMessage(msg)
-      self.logger.debug(msg)
     else:
       info = [self.server.torrentInfoStr(id) for id in ids]
       # only torrent exists in server
@@ -130,6 +129,13 @@ class T2bot(telepot.helper.ChatHandler):
         self.sender.sendMessage('System ok ...')
         self.logger.debug('System reboot done ... ')
 
+      # command - new tv schedule
+      elif '/new_tvshow' in msg['text']:
+        name, weekday, time, start_date, end_date, keyword = msg['text'].split(' ')[1].split('|')
+        keyword = keyword.replace(',', ' ')
+        for day in weekday.split(','):
+          db.createTvShow(name, day, time, start_date, end_date, keyword)
+
       # search torrents file using self.search function
       else: 
         self.mode = 'search'
@@ -138,12 +144,12 @@ class T2bot(telepot.helper.ChatHandler):
           self.bot.editMessageText(id, '...', reply_markup=None)
 
         self.sender.sendMessage('searching ...') 
-        self.logger.debug('user search keyword %s' % msg['text'])
+        self.logger.debug('user try to search keyword: %s' % msg['text'])
         self.torrents = self.search(unicode(msg['text'])) 
 
         if not len(self.torrents): 
           self.sender.sendMessage('There is no files searched.')
-          self.logger.debug('can not find torrent files ...')
+          self.logger.debug('can not find any torrent ...')
           self.edtTorrents = None
         else: 
           self.showTorrentsMenu(self.torrents)
@@ -190,17 +196,42 @@ class T2bot(telepot.helper.ChatHandler):
 
 # torrent monitoring
 class JobMonitor(telepot.helper.Monitor):
-  def __init__(self, seed_tuple, server, db):
+  def __init__(self, seed_tuple, search, server, db):
     super(JobMonitor, self).__init__(seed_tuple, capture=[{'_': lambda msg: True}])
     self.server = server 
+    self.search = search
     self.db = db
     self.logger = logging.getLogger('torrentbot')
     self.sched = BackgroundScheduler()
     self.sched.start()
     self.sched.add_job(self.torrentMonitor, 'interval', minutes=3)
     self.sched.add_job(self.keepAliveTorrentServer, 'interval', minutes=10)
+    self.sched.add_job(self.downloadTvShow, 'interval', minutes=120)
+    self.sched.add_job(self.createDailyTvSchedule, 'cron', hour=1, minute=0)
+
+    # self.createDailyTvSchedule()
+    # self.downloadTvShow()
 
     self.logger.debug('JobMonitor logger init ...')
+
+  def createDailyTvSchedule(self):
+    self.db.createDailySchedule()    
+    self.logger.info('daily schedule created')
+
+  def downloadTvShow(self):
+    schedule = self.db.uncompletedSchedule()
+    for episode in schedule:
+      torrents = self.search(unicode(episode['keyword']))
+      if not len(torrents): 
+        self.logger.info('can not find tvshow ' + str(episode))
+        self.db.increaseTvShowCount(episode['program_id'], episode['download_date'])
+      else: 
+        torrentInfo = self.server.add(torrents[0]['magnet'])
+        self.logger.info('new tvshow added ' + str(episode))
+        if torrentInfo:
+          self.db.completedTvSchedule(episode['program_id'], episode['download_date'])
+        # torrentInfo['chat_id'] = self.chat_id
+        # self.db.addTorrent(torrentInfo)
 
   def on_chat_message(self, msg): 
     pass
@@ -262,7 +293,7 @@ class ChatBox(telepot.DelegatorBot):
     super(ChatBox, self).__init__(token, 
     [
       (per_chat_id(), create_open(T2bot, 90, self.search, self.db, server)),
-      (per_application(), create_open(JobMonitor, self.server, self.db)),
+      (per_application(), create_open(JobMonitor, self.search, self.server, self.db)),
     ])
 	
 ########################################################################### 
@@ -281,7 +312,7 @@ if __name__ == '__main__':
     bot.message_loop(run_forever='Listening...')
 
   except KeyboardInterrupt:
-    print 'Interrupted'
+    print('Interrupted')
     try:
       sys.exit(0)
     except SystemExit:

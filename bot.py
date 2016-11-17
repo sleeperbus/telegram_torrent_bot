@@ -9,7 +9,9 @@ from pprint import pprint
 from random import randint
 import telepot
 import telepot.helper
-from telepot.delegate import per_chat_id, create_open, per_application
+from telepot.delegate import (
+	per_chat_id, create_open, per_application, pave_event_space
+)
 from telepot.namedtuple import (
   ReplyKeyboardMarkup, KeyboardButton, 
   ReplyKeyboardHide, ForceReply, 
@@ -28,8 +30,8 @@ reload(sys)
 sys.setdefaultencoding('utf-8')
 
 class T2bot(telepot.helper.ChatHandler):
-  def __init__(self, seed_tuple, timeout, search, db, server):
-    super(T2bot, self).__init__(seed_tuple, timeout)
+  def __init__(self, seed_tuple, search, db, server, **kwargs):
+    super(T2bot, self).__init__(seed_tuple, **kwargs)
     self.logger = logging.getLogger('torrentbot')
     self.logger.debug('Chatbot logger init')
     self.search = search
@@ -209,7 +211,7 @@ class JobMonitor(telepot.helper.Monitor):
     self.sched.add_job(self.downloadTvShow, 'interval', minutes=120)
     self.sched.add_job(self.createDailyTvSchedule, 'cron', hour=1, minute=0)
 
-    # self.createDailyTvSchedule()
+    self.createDailyTvSchedule()
     # self.downloadTvShow()
 
     self.logger.debug('JobMonitor logger init ...')
@@ -292,7 +294,9 @@ class ChatBox(telepot.DelegatorBot):
     
     super(ChatBox, self).__init__(token, 
     [
-      (per_chat_id(), create_open(T2bot, 90, self.search, self.db, server)),
+			pave_event_space()(
+				per_chat_id(), create_open, T2bot, self.search, self.db, self.server, timeout=90	
+			), 
       (per_application(), create_open(JobMonitor, self.search, self.server, self.db)),
     ])
 	

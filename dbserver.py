@@ -105,7 +105,8 @@ class dbserver:
                     , 0
                     , 0
             from    tv_program 
-            where   strftime('%Y%m%d') between ifnull(start_date, '19000101') and ifnull(end_date, '30000101')
+            where   strftime('%Y%m%d') between start_date and
+											case when end_date ='' then '30000101' else end_date end
             and     strftime('%w') = day 
           """
         )

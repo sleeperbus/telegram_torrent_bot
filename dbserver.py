@@ -105,7 +105,7 @@ class dbserver:
                     , 0
                     , 0
             from    tv_program 
-            where   strftime('%Y%m%d') between start_date and
+            where   replace(date('now', 'localtime'), '-', '') between start_date and
 											case when end_date ='' then '30000101' else end_date end
             and     strftime('%w') = day 
           """
@@ -191,7 +191,7 @@ class dbserver:
         self.con.execute(
           """
           update    tv_schedule
-          set       count = count + 1
+          set       try_count = try_count + 1
           where     program_id = ? 
           and       download_date = ?
           """, (program_id, download_date)

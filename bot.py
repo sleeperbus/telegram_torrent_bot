@@ -10,7 +10,8 @@ from random import randint
 import telepot
 import telepot.helper
 from telepot.delegate import (
-	per_chat_id, create_open, per_application, pave_event_space
+	per_chat_id, create_open, per_application, pave_event_space,
+  include_callback_query_chat_id
 )
 from telepot.namedtuple import (
   ReplyKeyboardMarkup, KeyboardButton, 
@@ -162,6 +163,7 @@ class T2bot(telepot.helper.ChatHandler):
   # When user click a inline button
   def on_callback_query(self, msg): 
     query_id, from_id, data = telepot.glance(msg, flavor='callback_query')
+    self.logger.debug('in callback')
 
     if not self.edtTorrents:
       self.bot.answerCallbackQuery(query_id, 
@@ -296,7 +298,8 @@ class ChatBox(telepot.DelegatorBot):
     
     super(ChatBox, self).__init__(token, 
     [
-			pave_event_space()(
+      include_callback_query_chat_id(
+			pave_event_space())(
 				per_chat_id(), create_open, T2bot, self.search, self.db, self.server, timeout=90	
 			), 
       (per_application(), create_open(JobMonitor, self.search, self.server, self.db)),

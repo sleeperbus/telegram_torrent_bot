@@ -136,8 +136,8 @@ class T2bot(telepot.helper.ChatHandler):
         name, weekday, time, start_date, end_date, keyword = msg['text'].split(' ')[1].split('|')
         keyword = keyword.replace(',', ' ')
         for day in weekday.split(','):
-				  for res in ['720', '1080']:
-	          db.createTvShow(name, day, time, start_date, end_date, keyword+' '+res)
+					for res in ['720', '1080']:
+						db.createTvShow(name, day, time, start_date, end_date, keyword+' '+res)
 
       # search torrents file using self.search function
       else: 

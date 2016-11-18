@@ -136,7 +136,8 @@ class T2bot(telepot.helper.ChatHandler):
         name, weekday, time, start_date, end_date, keyword = msg['text'].split(' ')[1].split('|')
         keyword = keyword.replace(',', ' ')
         for day in weekday.split(','):
-          db.createTvShow(name, day, time, start_date, end_date, keyword)
+				  for res in ['720', '1080']:
+	          db.createTvShow(name, day, time, start_date, end_date, keyword+' '+res)
 
       # search torrents file using self.search function
       else: 
@@ -212,15 +213,16 @@ class JobMonitor(telepot.helper.Monitor):
     self.sched.add_job(self.createDailyTvSchedule, 'cron', hour=1, minute=0)
 
     self.createDailyTvSchedule()
-    # self.downloadTvShow()
+    self.downloadTvShow()
 
     self.logger.debug('JobMonitor logger init ...')
 
   def createDailyTvSchedule(self):
     self.db.createDailySchedule()    
-    self.logger.info('daily schedule created')
+    self.logger.debug('daily schedule created')
 
   def downloadTvShow(self):
+    self.logger.debug('downloadTvShow started')
     schedule = self.db.uncompletedSchedule()
     for episode in schedule:
       torrents = self.search(unicode(episode['keyword']))

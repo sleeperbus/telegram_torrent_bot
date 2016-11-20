@@ -13,7 +13,10 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from random import randint
 import telepot
 import telepot.helper
-from telepot.delegate import per_chat_id, create_open, per_application
+from telepot.delegate import (
+	per_chat_id, create_open, pave_event_space,
+	include_callback_query_chat_id
+)
 from telepot.namedtuple import (
   ReplyKeyboardMarkup, KeyboardButton, 
   ReplyKeyboardHide, ForceReply, 
@@ -25,9 +28,10 @@ from telepot.namedtuple import (
 reload(sys)
 sys.setdefaultencoding('utf-8')
 
-class FileClassifier(telepot.helper.Monitor):
-  def __init__(self, seed_tuple, classifier, srcPath, destPath, baseProb, superUser):
-    super(FileClassifier, self).__init__(seed_tuple, capture=[{'_': lambda msg: True}])
+class FileClassifier(telepot.helper.ChatHandler):
+  def __init__(self, seed_tuple, classifier, srcPath, destPath, baseProb, superUser, **kwargs):
+    super(FileClassifier, self).__init__(seed_tuple, **kwargs) 
+#    super(FileClassifier, self).__init__(seed_tuple, capture=[{'_': lambda msg: True}])
     self.logger = logging.getLogger('fileclassifier')
     self.logger.debug('FileClassifier logger init')
     self.cl = cl
@@ -312,7 +316,10 @@ class ChatBot(telepot.DelegatorBot):
   def __init__(self, token, cl, srcPath, destPath, baseProb, superUser): 
     super(ChatBot, self).__init__(token, 
     [
-      (per_application(), create_open(FileClassifier, cl, srcPath, destPath, baseProb, superUser)),
+			include_callback_query_chat_id(
+			pave_event_space())(
+				per_chat_id(), create_open, FileClassifier, cl, srcPath, destPath,
+					baseProb, superUser, timeout=90)
     ])
 
 

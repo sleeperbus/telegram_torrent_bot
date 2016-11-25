@@ -107,7 +107,7 @@ class dbserver:
             from    tv_program 
             where   replace(date('now', 'localtime'), '-', '') between start_date and
 											case when end_date ='' then '30000101' else end_date end
-            and     strftime('%w') = day 
+            and     strftime('%w', 'now', 'localtime') = day 
           """
         )
     except sqlite.IntegrityError:

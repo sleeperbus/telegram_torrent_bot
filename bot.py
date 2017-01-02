@@ -70,7 +70,7 @@ class T2bot(telepot.helper.ChatHandler):
 
   # Send torrent info string 
   def showTorrentsProgress(self):
-    ids = self.db.torrentIds
+    ids = self.db.torrentIds(self.chat_id)
     if len(ids) == 0: 
       msg = 'There is no torrents downloading ...'
       self.sender.sendMessage(msg)

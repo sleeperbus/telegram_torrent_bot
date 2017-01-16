@@ -138,7 +138,7 @@ class T2bot(telepot.helper.ChatHandler):
         keyword = keyword.replace(',', ' ')
         for day in weekday.split(','):
 					for res in ['720', '1080']:
-						db.createTvShow(name, day, time, start_date, end_date, keyword+' '+res)
+						self.db.createTvShow(name, day, time, start_date, end_date, keyword+' '+res, self.chat_id)
 
       # search torrents file using self.search function
       else: 
@@ -176,7 +176,7 @@ class T2bot(telepot.helper.ChatHandler):
     if self.mode == 'search':
       self.bot.editMessageText(id, 'Adding,  %s' % 
         self.torrents[int(data)]['title'], reply_markup=None)
-      self.addTorrent(torrent['magnet'])
+      self.addTorrent(torrent['magnet'], self.chat_id)
 
     elif self.mode == 'delete': 
       self.bot.editMessageText(id, 'Deleting, %s' % 
@@ -184,14 +184,14 @@ class T2bot(telepot.helper.ChatHandler):
       self.deleteTorrent(torrent['id'])
 
   # add torrent magnet to torrent server and db server 
-  def addTorrent(self, magnet):
+  def addTorrent(self, magnet, chat_id):
     torrentInfo = self.server.add(magnet) 
     if not torrentInfo:
       self.sender.sendMessage('Already in list')
       self.logger.debug('torrent user add is already in deluge, maybe')
       return
 
-    torrentInfo['chat_id'] = self.chat_id
+    torrentInfo['chat_id'] = chat_id
     self.db.addTorrent(torrentInfo)
 
   # remove torrent file from torrent server and db server
@@ -225,6 +225,7 @@ class JobMonitor(telepot.helper.Monitor):
 
   def downloadTvShow(self):
     self.logger.debug('downloadTvShow started')
+    # 완료되지 않은 스케줄을 가져온다. 
     schedule = self.db.uncompletedSchedule()
     for episode in schedule:
       torrents = self.search(unicode(episode['keyword']))
@@ -232,12 +233,15 @@ class JobMonitor(telepot.helper.Monitor):
         self.logger.info('can not find tvshow ' + str(episode))
         self.db.increaseTvShowCount(episode['program_id'], episode['download_date'])
       else: 
+        # torrent 를 발견한다면 deluge 에 magnet 을 던진다. 
         torrentInfo = self.server.add(torrents[0]['magnet'])
+        torrentInfo['chat_id'] = episode['chat_id']
         self.logger.info('new tvshow added ' + str(episode))
         if torrentInfo:
+          # 스케줄을 완료처리하고 사용자에게 db 에도 토렌트 정보를 입력한다. 
           self.db.completedTvSchedule(episode['program_id'], episode['download_date'])
-        # torrentInfo['chat_id'] = self.chat_id
-        # self.db.addTorrent(torrentInfo)
+          torrentInfo['chat_id'] = episode['chat_id']
+          self.db.addTorrent(torrentInfo)
 
   def on_chat_message(self, msg): 
     pass

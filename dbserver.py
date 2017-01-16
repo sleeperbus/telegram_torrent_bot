@@ -37,6 +37,8 @@ class dbserver:
         , start_date
         , end_date
         , search_keyword 
+        , chat_id
+        , foreign key(cha_id) references users(chat_id)
       )
       """
     )
@@ -51,6 +53,11 @@ class dbserver:
           , primary key(program_id, download_date)
           , foreign key(program_id) references tv_program(program_id)
         )
+      """
+    )
+
+    self.con.execute(
+      """
       """
     )
  
@@ -69,7 +76,7 @@ class dbserver:
     return res[0]
 
   # 새로운 티비 프로그램을 입력한다. 
-  def createTvShow(self, name, day, time, startDate, endDate, keyword):
+  def createTvShow(self, name, day, time, startDate, endDate, keyword, chat_id):
 		try:
 			with self.con:
 				self.con.execute(
@@ -81,8 +88,9 @@ class dbserver:
 						, start_date
 						, end_date
 						, search_keyword
-					) values (?,?,?,?,?,?)
-					""", (name, day, time, startDate, endDate, keyword)
+            , chat_id
+					) values (?,?,?,?,?,?,?)
+					""", (name, day, time, startDate, endDate, keyword, chat_id)
 				)
 		except sqlite.Error as err:
 			print('Error: insert new tvshow ')
@@ -175,15 +183,17 @@ class dbserver:
     cur = self.con.execute(
       """
       select  a.download_date || ' ' || b.search_keyword as keyword 
-              , a.program_id
-              , a.download_date
-      from    tv_schedule a, tv_program b
+              , a.program_id as program_id
+              , a.download_date as download_date
+              , b.chat_id as chat_id
+      from    tv_schedule a
+              , tv_program b
       where   a.completed = 0 
       and     b.program_id = a.program_id
       """
     )
     results = cur.fetchall()
-    return [{'keyword':r[0], 'program_id':r[1], 'download_date':r[2]} for r in results]
+    return [{'keyword':r[0], 'program_id':r[1], 'download_date':r[2], 'chat_id':r[3]} for r in results]
 
   def increaseTvShowCount(self, program_id, download_date):
     try:

@@ -15,7 +15,7 @@ from telepot.delegate import (
 )
 from telepot.namedtuple import (
   ReplyKeyboardMarkup, KeyboardButton, 
-  ReplyKeyboardHide, ForceReply, 
+  ForceReply, 
   InlineKeyboardMarkup, InlineKeyboardButton,
   InlineQueryResultArticle, InlineQueryResultPhoto, 
   InputTextMessageContent 

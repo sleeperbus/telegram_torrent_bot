@@ -137,7 +137,7 @@ class T2bot(telepot.helper.ChatHandler):
         keyword = keyword.replace(',', ' ')
         for day in weekday.split(','):
 					for res in ['720', '1080']:
-						self.db.createTvShow(name, day, time, start_date, keyword+' '+res, self.chat_id)
+						self.db.subscribeTvShow(name, day, time, start_date, keyword+' '+res, self.chat_id)
 
       # 설정된 tvshow 목록을 확인한다. 
       elif '/close_tvshow' in msg['text']:

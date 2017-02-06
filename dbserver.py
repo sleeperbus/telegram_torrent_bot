@@ -76,7 +76,7 @@ class dbserver:
     return res[0]
 
   # 새로운 티비 프로그램을 입력한다. 
-  def subscribeTvShow(self, name, day, time, startDate, endDate, keyword, chat_id):
+  def subscribeTvShow(self, name, day, time, startDate, keyword, chat_id):
 		try:
 			with self.con:
 				self.con.execute(
@@ -86,10 +86,9 @@ class dbserver:
 						, day
 						, time
 						, start_date
-						, end_date
 						, search_keyword
             , chat_id
-					) values (?,?,?,?,?,?,?)
+					) values (?,?,?,?,?,?)
 					""", (name, day, time, startDate, keyword, chat_id)
 				)
 		except sqlite.Error as err:

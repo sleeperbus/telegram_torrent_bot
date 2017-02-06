@@ -2,6 +2,18 @@
 ## 라이브러리 
 [Telepot Tutorial](http://telepot.readthedocs.io/en/latest/)을 보고 해당 라이브러리를 설치한다. 
 
+## 최근 변경사항 
+### v1.1(2017-02-06)
+#### 기능 추가 
+* tvshow의 종료일을 설정할 수 있다. 명령어: /close_tvshow
+
+#### 기능 변경 
+* tvshow 를 추가할 때 end_date 를 입력받지 않는다. 
+  * /add_tvshow 보이스|6,0|2000|20170101|보이스
+
+#### bug fix 
+* daily tv schedule 생성시 localtime 기준으로 row 를 생성한다. 
+
 ## settings.json 설정 
 * token: 두 개의 토큰을 사용한다.  
   *  torrent: 토렌트를 검색하고 다운받는 봇에서 사용한다. 
@@ -20,7 +32,6 @@ python fileclassify.py
 
 ## 앞으로 개발할 기능 
 ### 다운로드 봇 
-* 설정된 티비쇼 목록 확인 및 삭제 
 * 다운로드 대기 중인 티비쇼 에피소드 확인 및 삭제
 
 ### 분류 봇 

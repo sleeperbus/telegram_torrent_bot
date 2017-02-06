@@ -7,6 +7,7 @@ import json
 
 from pprint import pprint
 from random import randint
+from datetime import datetime
 import telepot
 import telepot.helper
 from telepot.delegate import (
@@ -38,13 +39,13 @@ class T2bot(telepot.helper.ChatHandler):
     self.search = search
     self.server = deluge()
     self.db = db
-    self.torrents = []
+    self.items = []
     self.mode = ''
 
     # inline keyboards
-    self.edtTorrents = None
+    self.savedMsgIdentifier = None
 
-    self.kbdTorrents = InlineKeyboardMarkup(
+    self.inlineButtons = InlineKeyboardMarkup(
       inline_keyboard=[]
     )
    
@@ -59,14 +60,11 @@ class T2bot(telepot.helper.ChatHandler):
       return 
     self.sender.sendMessage('Welcome back')
  
-  # Send inline buttons contain torrent title
-  def showTorrentsMenu(self, torrents):
-    l = [[InlineKeyboardButton(text=t['title'], callback_data=str(i))] 
-          for i, t in enumerate(torrents) if t] 
-    self.kbdTorrents = InlineKeyboardMarkup(inline_keyboard=l)
-    self.edtTorrents = self.sender.sendMessage('Choose ...', 
-                        reply_markup=self.kbdTorrents)
-
+  # user에게 선택 버튼을 보여준다. 
+  def showItems(self, items):
+    l = [[InlineKeyboardButton(text=item['title'], callback_data=str(index))] for index, item in enumerate(items) if item]
+    self.inlineButtons = InlineKeyboardMarkup(inline_keyboard=l)
+    self.savedMsgIdentifier = self.sender.sendMessage('Choose ...', reply_markup=self.inlineButtons)
 
   # Send torrent info string 
   def showTorrentsProgress(self):
@@ -111,17 +109,18 @@ class T2bot(telepot.helper.ChatHandler):
       elif msg['text'] == '/delete':
         self.mode = 'delete'
         # clear message identifier saved
-        if self.edtTorrents:
-          id = telepot.message_identifier(self.edtTorrents)
+        if self.savedMsgIdentifier:
+          id = telepot.message_identifier(self.savedMsgIdentifier)
           self.bot.editMessageText(id, '...', reply_markup=None)
 
         self.sender.sendMessage('Select torrent to delete ...')
-        self.torrents = self.ongoingList()
-        if len(self.torrents) == 0: 
+        self.items = self.ongoingList()
+        if len(self.items) == 0: 
           self.sender.sendMessage('There is no downloading files.')
-          self.edtTorrents = None
+          self.savedMsgIdentifier = None
         else:
-          self.showTorrentsMenu(self.torrents) 
+          self.showItems(self.items) 
+          # self.showTorrentsMenu(self.torrents) 
 
       # command - reboot
       elif msg['text'] == '/reboot':
@@ -134,29 +133,44 @@ class T2bot(telepot.helper.ChatHandler):
 
       # command - new tv schedule
       elif '/new_tvshow' in msg['text']:
-        name, weekday, time, start_date, end_date, keyword = msg['text'].split(' ')[1].split('|')
+        name, weekday, time, start_date, keyword = msg['text'].split(' ')[1].split('|')
         keyword = keyword.replace(',', ' ')
         for day in weekday.split(','):
 					for res in ['720', '1080']:
-						self.db.createTvShow(name, day, time, start_date, end_date, keyword+' '+res, self.chat_id)
+						self.db.createTvShow(name, day, time, start_date, keyword+' '+res, self.chat_id)
+
+      # 설정된 tvshow 목록을 확인한다. 
+      elif '/close_tvshow' in msg['text']:
+        self.mode = 'close_tvshow'
+        if self.savedMsgIdentifier:
+          id = telepot.message_identifier(self.savedMsgIdentifier)
+          self.bot.editMessageText(id, '...', reply_markup=None)
+        self.sender.sendMessage('오늘부터 스케줄링을 하지 않을 티비쇼를 고르세요.')
+        self.logger.debug('chat_id is %d' % self.chat_id)
+        self.items = self.db.tvShowList(self.chat_id)
+        if len(self.items) == 0:
+          self.sender.sendMessage('활성화된 티비쇼가 없습니다.')
+          self.savedMsgIdentifier = None
+        else:
+          self.showItems(self.items)
 
       # search torrents file using self.search function
       else: 
         self.mode = 'search'
-        if self.edtTorrents:
-          id = telepot.message_identifier(self.edtTorrents)
+        if self.savedMsgIdentifier:
+          id = telepot.message_identifier(self.savedMsgIdentifier)
           self.bot.editMessageText(id, '...', reply_markup=None)
 
         self.sender.sendMessage('searching ...') 
         self.logger.debug('user try to search keyword: %s' % msg['text'])
-        self.torrents = self.search(unicode(msg['text'])) 
+        self.items = self.search(unicode(msg['text'])) 
 
-        if not len(self.torrents): 
+        if not len(self.items): 
           self.sender.sendMessage('There is no files searched.')
           self.logger.debug('can not find any torrent ...')
-          self.edtTorrents = None
+          self.savedMsgIdentifier = None
         else: 
-          self.showTorrentsMenu(self.torrents)
+          self.showItems(self.items)
 
     else: self.sender.sendMessage('You can only send text message.')
 
@@ -165,23 +179,27 @@ class T2bot(telepot.helper.ChatHandler):
     query_id, from_id, data = telepot.glance(msg, flavor='callback_query')
     self.logger.debug('in callback')
 
-    if not self.edtTorrents:
+    if not self.savedMsgIdentifier:
       self.bot.answerCallbackQuery(query_id, 
         text='Overdue list, please search again')
       return 
 
-    id = telepot.message_identifier(self.edtTorrents) 
-    torrent = self.torrents[int(data)]
+    id = telepot.message_identifier(self.savedMsgIdentifier) 
 
     if self.mode == 'search':
-      self.bot.editMessageText(id, 'Adding,  %s' % 
-        self.torrents[int(data)]['title'], reply_markup=None)
+      torrent = self.items[int(data)]
+      self.bot.editMessageText(id, 'Adding,  %s' % torrent['title'], reply_markup=None)
       self.addTorrent(torrent['magnet'], self.chat_id)
 
     elif self.mode == 'delete': 
-      self.bot.editMessageText(id, 'Deleting, %s' % 
-       self.torrents[int(data)]['title'], reply_markup=None)
+      torrent = self.items[int(data)]
+      self.bot.editMessageText(id, 'Deleting, %s' % torrent['title'], reply_markup=None)
       self.deleteTorrent(torrent['id'])
+
+    elif self.mode == 'close_tvshow':
+      tvshow = self.items[int(data)]
+      self.bot.editMessageText(id, '오늘부터 [%s]를 스케줄링 하지 않습니다.' % tvshow['title'], reply_markup=None)
+      self.db.unsubscribeTvShow(tvshow['program_id'], datetime.today().strftime('%Y%m%d'))
 
   # add torrent magnet to torrent server and db server 
   def addTorrent(self, magnet, chat_id):
@@ -211,11 +229,11 @@ class JobMonitor(telepot.helper.Monitor):
     self.sched.start()
     self.sched.add_job(self.torrentMonitor, 'interval', minutes=3)
     self.sched.add_job(self.keepAliveTorrentServer, 'interval', minutes=10)
-    self.sched.add_job(self.downloadTvShow, 'interval', minutes=120)
+    self.sched.add_job(self.downloadTvEpisodes, 'interval', minutes=120)
     self.sched.add_job(self.createDailyTvSchedule, 'cron', hour=1, minute=0)
 
-    self.createDailyTvSchedule()
-    self.downloadTvShow()
+    # self.createDailyTvSchedule()
+    # self.downloadTvEpisodes()
 
     self.logger.debug('JobMonitor logger init ...')
 
@@ -223,23 +241,23 @@ class JobMonitor(telepot.helper.Monitor):
     self.db.createDailySchedule()    
     self.logger.debug('daily schedule created')
 
-  def downloadTvShow(self):
-    self.logger.debug('downloadTvShow started')
+  def downloadTvEpisodes(self):
+    self.logger.debug('downloadTvEpisodes started')
     # 완료되지 않은 스케줄을 가져온다. 
-    schedule = self.db.uncompletedSchedule()
+    schedule = self.db.uncompletedTvEpisode()
     for episode in schedule:
       torrents = self.search(unicode(episode['keyword']))
       if not len(torrents): 
         self.logger.info('can not find tvshow ' + str(episode))
-        self.db.increaseTvShowCount(episode['program_id'], episode['download_date'])
+        self.db.increaseTvEpisodeCount(episode['program_id'], episode['download_date'])
       else: 
         # torrent 를 발견한다면 deluge 에 magnet 을 던진다. 
         torrentInfo = self.server.add(torrents[0]['magnet'])
         torrentInfo['chat_id'] = episode['chat_id']
         self.logger.info('new tvshow added ' + str(episode))
         if torrentInfo:
-          # 스케줄을 완료처리하고 사용자에게 db 에도 토렌트 정보를 입력한다. 
-          self.db.completedTvSchedule(episode['program_id'], episode['download_date'])
+          # 스케줄을 완료처리하고 db 에 토렌트 정보를 입력한다.
+          self.db.completeTvEpisode(episode['program_id'], episode['download_date'])
           torrentInfo['chat_id'] = episode['chat_id']
           self.db.addTorrent(torrentInfo)
 

@@ -38,7 +38,7 @@ class dbserver:
         , end_date
         , search_keyword 
         , chat_id
-        , foreign key(cha_id) references users(chat_id)
+        , foreign key(chat_id) references users(chat_id)
       )
       """
     )
@@ -76,7 +76,7 @@ class dbserver:
     return res[0]
 
   # 새로운 티비 프로그램을 입력한다. 
-  def createTvShow(self, name, day, time, startDate, endDate, keyword, chat_id):
+  def subscribeTvShow(self, name, day, time, startDate, endDate, keyword, chat_id):
 		try:
 			with self.con:
 				self.con.execute(
@@ -90,11 +90,26 @@ class dbserver:
 						, search_keyword
             , chat_id
 					) values (?,?,?,?,?,?,?)
-					""", (name, day, time, startDate, endDate, keyword, chat_id)
+					""", (name, day, time, startDate, keyword, chat_id)
 				)
 		except sqlite.Error as err:
 			print('Error: insert new tvshow ')
 			pprint(err)
+
+  # 티비쇼를 해지한다.
+  def unsubscribeTvShow(self, program_id, end_date):
+    try:
+      with self.con:
+        self.con.execute(
+          """
+            update  tv_program 
+            set     end_date = ?
+            where   program_id = ?
+          """, (end_date, program_id, )
+        )
+    except sqlite.Error as err:
+      print('unsubscribeTvShow update error')
+      pprint(err)
 
   # tv_program 을 기반으로 일별 스케줄을 생성한다. 
   def createDailySchedule(self):
@@ -109,19 +124,19 @@ class dbserver:
               , completed
             ) 
             select  program_id
-                    , substr(strftime('%Y%m%d'), 3)
+                    , substr(strftime('%Y%m%d', 'now', 'localtime'), 3)
                     , 0
                     , 0
             from    tv_program 
             where   replace(date('now', 'localtime'), '-', '') between start_date and
 											case when end_date ='' then '30000101' else end_date end
-            and     strftime('%w', 'now', 'localtime') = day 
-          """
+            and     strftime('%w', 'now', 'localtime') = day
+           """
         )
     except sqlite.IntegrityError:
       print('db error: dup on val: already in tv_schedule')
 
-  # 
+  # 토렌트 정보를 db 에 저장한다.
   def addTorrent(self, tinfo):
     try:
       with self.con: 
@@ -134,7 +149,7 @@ class dbserver:
       print('db error: dup on val')
       pprint(tinfo) 
 
-  # 
+  # 토렌트 정보를 db에서 삭제한다.
   def deleteTorrent(self, chat_id, id):
     try:
       with self.con:
@@ -145,6 +160,7 @@ class dbserver:
       print('db error: delete')
       pprint(err) 
 
+  # 진행 중인 토렌트에 완료처리를 한다. 
   def completeTorrent(self, chat_id, id):
     try:
       with self.con:
@@ -160,7 +176,7 @@ class dbserver:
       print('db error: update')
       pprint(err) 
 
-  # 
+  # 토렌트 고유id를 반환한다. 마그넷과 동일하다.
   def torrentIds(self, chat_id):
     cur = self.con.execute("""
     select  id 
@@ -170,6 +186,7 @@ class dbserver:
     results = cur.fetchall()
     return [r[0] for r in results]
 
+  # 완료되지 않은 토렌트 즉, 다운로드 진행 중인 것을 반환한다. 
   def uncompleted(self):
     cur = self.con.execute("""
       select  distinct id, chat_id
@@ -179,7 +196,8 @@ class dbserver:
     results = cur.fetchall()
     return [{'id':r[0], 'chat_id':r[1]} for r in results]
 
-  def uncompletedSchedule(self):
+  # 스케쥴링 된 tvshow episode 를 반환한다. 
+  def uncompletedTvEpisode(self):
     cur = self.con.execute(
       """
       select  a.download_date || ' ' || b.search_keyword as keyword 
@@ -195,7 +213,8 @@ class dbserver:
     results = cur.fetchall()
     return [{'keyword':r[0], 'program_id':r[1], 'download_date':r[2], 'chat_id':r[3]} for r in results]
 
-  def increaseTvShowCount(self, program_id, download_date):
+  # 스케줄링 된 tvshow episode 의 count 를 증가시킨다. 
+  def increaseTvEpisodeCount(self, program_id, download_date):
     try:
       with self.con:
         self.con.execute(
@@ -210,7 +229,8 @@ class dbserver:
       print('db error: update')
       pprint(err) 
 
-  def completedTvSchedule(self, program_id, download_date):
+  # episode 를 완료처리 한다. 
+  def completeTvEpisode(self, program_id, download_date):
     try:
       with self.con:
         self.con.execute(
@@ -224,6 +244,38 @@ class dbserver:
     except sqlite.Error as err:
       print('db error: update')
       pprint(err) 
+
+  # 설정된 tvshow 목록을 반환한다. 
+  def tvShowList(self, chat_id):
+    try:
+      with self.con:
+        cur = self.con.execute(
+          """
+          select  a.program_id
+                  , a.program_name
+                  , a.search_keyword
+                  , case 
+                    when a.end_date <> '' then '(종료일: ' || a.end_date || ')'
+                    else ''
+                    end end_date
+          from    tv_program a 
+          where   a.chat_id = ?
+          and     (a.end_date >= strftime('%Y%m%d', 'now', 'localtime') or 
+                    a.end_date = '')
+          """, (chat_id,)
+      )
+    except sqlite.Error as err:
+      pprint(err)
+    results = cur.fetchall()
+    return [{'program_id':r[0], 'title':r[1]+'-'+r[2]+r[3]} for r in results]
+
+
+
+
+
+
+
+
 
 
 

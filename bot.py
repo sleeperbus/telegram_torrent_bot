@@ -8,6 +8,7 @@ import json
 from pprint import pprint
 from random import randint
 from datetime import datetime
+from datetime import timedelta
 import telepot
 import telepot.helper
 from telepot.delegate import (
@@ -153,6 +154,20 @@ class T2bot(telepot.helper.ChatHandler):
           self.savedMsgIdentifier = None
         else:
           self.showItems(self.items)
+      # schedule 되어 있는 목록을 확인한다.
+      elif '/episodes' in msg['text']:
+        self.mode = 'episodes'
+        if self.savedMsgIdentifier:
+          id = telepot.message_identifier(self.savedMsgIdentifier)
+          self.bot.editMessageText(id, '...', reply_markup=None)
+        self.sender.sendMessage('대기 중인 스케줄 목록입니다. 종료할 항목을 선택하세요.')
+        self.items = self.db.watingEpisodes(self.chat_id, datetime.today().strftime('%Y%m%d'))
+        if len(self.items) == 0:
+          self.sender.sendMessage('대기 중인 스케줄이 없습니다.')
+          self.savedMsgIdentifier = None
+        else:
+          self.showItems(self.items)
+
 
       # search torrents file using self.search function
       else: 
@@ -201,6 +216,11 @@ class T2bot(telepot.helper.ChatHandler):
       self.bot.editMessageText(id, '오늘부터 [%s]를 스케줄링 하지 않습니다.' % tvshow['title'], reply_markup=None)
       self.db.unsubscribeTvShow(tvshow['program_id'], datetime.today().strftime('%Y%m%d'))
 
+    elif self.mode == 'episodes':
+      episode = self.items[int(data)]
+      self.bot.editMessageText(id, '[%s]를 스케줄에서 삭제합니다..' % episode['title'], reply_markup=None)
+      self.db.deleteEpisode(episode['program_id'], episode['download_date'])
+
   # add torrent magnet to torrent server and db server 
   def addTorrent(self, magnet, chat_id):
     torrentInfo = self.server.add(magnet) 
@@ -231,16 +251,18 @@ class JobMonitor(telepot.helper.Monitor):
     self.sched.add_job(self.keepAliveTorrentServer, 'interval', minutes=10)
     self.sched.add_job(self.downloadTvEpisodes, 'interval', minutes=120)
     self.sched.add_job(self.createDailyTvSchedule, 'cron', hour=1, minute=0)
+    self.sched.add_job(self.deleteOldEpisodes, 'cron', hour=9, minute=0)
 
-    # self.createDailyTvSchedule()
-    # self.downloadTvEpisodes()
-
+    self.deleteOldEpisodes()
     self.logger.debug('JobMonitor logger init ...')
 
+  # 해당 요일의 episodes 를 추가한다.
   def createDailyTvSchedule(self):
     self.db.createDailySchedule()    
     self.logger.debug('daily schedule created')
 
+  # tv_schedule 에 대기 중인 episodes 를 검색해서 
+  # torrents 테이블에 넣는다.
   def downloadTvEpisodes(self):
     self.logger.debug('downloadTvEpisodes started')
     # 완료되지 않은 스케줄을 가져온다. 
@@ -270,15 +292,19 @@ class JobMonitor(telepot.helper.Monitor):
   def on_close(self, e):
     self.logger.debug('JobMonitor will shutdown')
     self.shutdown()
-   
+ 
   def shutdown(self):
     self.sched.shutdown()
 
+  # deluged 가 생각보다 잘 뻗기 때문에 process 가 살아있는지 가끔 확인하고
+  # 죽어 있으면 되살린다. 
   def keepAliveTorrentServer():
     if not self.server.isAlive():
       self.logger.warn('Server down, will reboot')
       self.server.reboot()
 
+  # torrents 테이블에 있는 토렌트 정보와 deluged 서버에서 진행 중인 
+  # 토렌트 정보를 비교해서 complete 처리를 한다.
   def torrentMonitor(self):
     self.logger.debug('========== DB ==========')
     fromDB = self.db.uncompleted() 
@@ -310,6 +336,20 @@ class JobMonitor(telepot.helper.Monitor):
       # self.db.completeTorrent(t['chat_id'], t['id'])
       self.server.delete(t['id'])
       self.db.deleteTorrent(t['chat_id'], t['id'])
+
+  # 오래된 tv episodes 들을 지운다.
+  # tv_program 을 추가한 유저별로 삭제메세지를 날린다.
+  def deleteOldEpisodes(self):
+    yesterday = datetime.today()-timedelta(weeks=1)
+    episodes = self.db.watingEpisodes('%', yesterday.strftime('%Y%m%d'))
+    episodesPerUser = {}
+    for episode in episodes:
+      self.db.deleteEpisode(episode['program_id'], episode['download_date'])
+      episodesPerUser.setdefault(episode['chat_id'], []).append(episode['title'])
+
+    for user in episodesPerUser.keys():
+      episodesPerUser[user].insert(0, '1주일 동안 검색 중인 아래 에피소드를 삭제합니다.')
+      self.bot.sendMessage(user, '\n'.join(episodesPerUser[user]))
 
 # Delegator Bot
 class ChatBox(telepot.DelegatorBot):

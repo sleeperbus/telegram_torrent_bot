@@ -3,6 +3,12 @@
 [Telepot Tutorial](http://telepot.readthedocs.io/en/latest/)을 보고 해당 라이브러리를 설치한다. 
 
 ## 최근 변경사항 
+### v1.11(2017-02-07)
+#### hot fix 
+* 1주일이 넘게 대기하고 있는 tv schedule은 자동으로 중지하고 사용자에게 통보한다. 
+* /close_tvshow 실행시 해당 tvshow의 요일도 표시해준다.
+* /close_tvshow 에서 목록을 조회시 end_date is null 조건을 포함한다.
+
 ### v1.1(2017-02-06)
 #### 기능 추가 
 * tvshow의 종료일을 설정할 수 있다. 명령어: /close_tvshow
@@ -33,6 +39,7 @@ python fileclassify.py
 ## 앞으로 개발할 기능 
 ### 다운로드 봇 
 * 다운로드 대기 중인 티비쇼 에피소드 확인 및 삭제
+* 토렌트 검색시 return 된 결과물이 10개보다 많을 경우 page nation
 
 ### 분류 봇 
 * 파일을 목적지 디렉토리로 옮길 때 파일명을 깔끔하게 정리

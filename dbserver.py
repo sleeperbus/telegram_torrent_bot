@@ -257,16 +257,76 @@ class dbserver:
                     when a.end_date <> '' then '(종료일: ' || a.end_date || ')'
                     else ''
                     end end_date
+                  , case 
+                    when a.day = '0' then '일'
+                    when a.day = '1' then '월'
+                    when a.day = '2' then '화'
+                    when a.day = '3' then '수'
+                    when a.day = '4' then '목'
+                    when a.day = '5' then '금'
+                    when a.day = '6' then '토'
+                    end day
           from    tv_program a 
           where   a.chat_id = ?
           and     (a.end_date >= strftime('%Y%m%d', 'now', 'localtime') or 
-                    a.end_date = '')
+                    a.end_date = '' or a.end_date is null)
           """, (chat_id,)
       )
     except sqlite.Error as err:
       pprint(err)
     results = cur.fetchall()
-    return [{'program_id':r[0], 'title':r[1]+'-'+r[2]+r[3]} for r in results]
+    return [{'program_id':r[0], 'title':'%s(%s)-%s%s' % (r[1], r[4], r[2], r[3])} for r in results]
+
+  # 기준일보다 오래된 tv schedule 을 반환한다. 
+  def watingEpisodes(self, chat_id, base_date):
+    try:
+      with self.con:
+        cur = self.con.execute(
+        """
+        select  a.program_id
+                , a.download_date
+                , b.program_name
+                , case 
+                    when b.day = '0' then '일'
+                    when b.day = '1' then '월'
+                    when b.day = '2' then '화'
+                    when b.day = '3' then '수'
+                    when b.day = '4' then '목'
+                    when b.day = '5' then '금'
+                    when b.day = '6' then '토'
+                    end day
+                , b.search_keyword
+                , b.chat_id
+        from    tv_schedule a, tv_program b
+        where   a.completed = 0
+        and     a.download_date <= substr(?, 3)
+        and     b.program_id = a.program_id
+        and     b.chat_id like ?
+        """, (base_date, chat_id,)
+        ) 
+    except sqlite.Error as err:
+      pprint(err)
+    results = cur.fetchall()
+    return [{'program_id':r[0], 'download_date':r[1], 
+      'title':'%s(%s-%s)-%s' % (r[2], r[3], r[1], r[4]), 'chat_id':r[5]} for r in results]
+
+  # tv schedule 을 삭제한다. 
+  def deleteEpisode(self, program_id, download_date):
+    # print('program_id: %s, download_date:%s' % (program_id, download_date))
+    try:
+      with self.con:
+        self.con.execute(
+          """
+          delete    from tv_schedule
+          where     program_id = ? 
+          and       download_date = ?
+          """, (program_id, download_date,)
+        )
+    except sqlite.Error as err:
+      print('db error: delete tv_schedule')
+      pprint(err) 
+
+
 
 
 

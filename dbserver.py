@@ -128,7 +128,7 @@ class dbserver:
                     , 0
             from    tv_program 
             where   replace(date('now', 'localtime'), '-', '') between start_date and
-											case when end_date ='' then '30000101' else end_date end
+											case when end_date ='' or end_date is null then '30000101' else end_date end
             and     strftime('%w', 'now', 'localtime') = day
            """
         )

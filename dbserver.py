@@ -77,23 +77,23 @@ class dbserver:
 
   # 새로운 티비 프로그램을 입력한다. 
   def subscribeTvShow(self, name, day, time, startDate, keyword, chat_id):
-		try:
-			with self.con:
-				self.con.execute(
-					"""
-					insert into tv_program(
-						program_name
-						, day
-						, time
-						, start_date
-						, search_keyword
+    try:
+      with self.con:
+        self.con.execute(
+          """
+          insert into tv_program(
+            program_name
+            , day
+            , time
+            , start_date
+            , search_keyword
             , chat_id
-					) values (?,?,?,?,?,?)
-					""", (name, day, time, startDate, keyword, chat_id)
-				)
-		except sqlite.Error as err:
-			print('Error: insert new tvshow ')
-			pprint(err)
+          ) values (?,?,?,?,?,?)
+          """, (name, day, time, startDate, keyword, chat_id)
+        )
+    except sqlite.Error as err:
+      print('Error: insert new tvshow ')
+      pprint(err)
 
   # 티비쇼를 해지한다.
   def unsubscribeTvShow(self, program_id, end_date):
@@ -128,7 +128,7 @@ class dbserver:
                     , 0
             from    tv_program 
             where   replace(date('now', 'localtime'), '-', '') between start_date and
-											case when end_date ='' or end_date is null then '30000101' else end_date end
+                      case when end_date ='' or end_date is null then '30000101' else end_date end
             and     strftime('%w', 'now', 'localtime') = day
            """
         )

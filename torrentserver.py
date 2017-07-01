@@ -103,9 +103,9 @@ class deluge:
 
   # return torrents completed
   def completed(self):
-  	torrents = self.ongoing()
-	torrents = [t for t in torrents if t['state'] == 'seeding']
-	return torrents
+    torrents = self.ongoing()
+    torrents = [t for t in torrents if t['state'] == 'seeding']
+    return torrents
  
   # parse deluge-console info
   def parse(self, info, torrentSep='\n \n', lineSep = '\n'):

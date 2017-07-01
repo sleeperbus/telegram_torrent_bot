@@ -12,7 +12,7 @@ from datetime import timedelta
 import telepot
 import telepot.helper
 from telepot.delegate import (
-	per_chat_id, create_open, per_application, pave_event_space,
+  per_chat_id, create_open, per_application, pave_event_space,
   include_callback_query_chat_id
 )
 from telepot.namedtuple import (
@@ -29,8 +29,8 @@ from dbserver import dbserver
 from apscheduler.schedulers.background import BackgroundScheduler
 import docclass
 
-reload(sys)
-sys.setdefaultencoding('utf-8')
+# reload(sys)
+# sys.setdefaultencoding('utf-8')
 
 class T2bot(telepot.helper.ChatHandler):
   def __init__(self, seed_tuple, search, db, server, **kwargs):
@@ -137,8 +137,8 @@ class T2bot(telepot.helper.ChatHandler):
         name, weekday, time, start_date, keyword = msg['text'].split(' ')[1].split('|')
         keyword = keyword.replace(',', ' ')
         for day in weekday.split(','):
-					for res in ['720', '1080']:
-						self.db.subscribeTvShow(name, day, time, start_date, keyword+' '+res, self.chat_id)
+          for res in ['720', '1080']:
+            self.db.subscribeTvShow(name, day, time, start_date, keyword+' '+res, self.chat_id)
 
       # 설정된 tvshow 목록을 확인한다. 
       elif '/close_tvshow' in msg['text']:
@@ -178,7 +178,8 @@ class T2bot(telepot.helper.ChatHandler):
 
         self.sender.sendMessage('searching ...') 
         self.logger.debug('user try to search keyword: %s' % msg['text'])
-        self.items = self.search(unicode(msg['text'])) 
+        self.items = self.search(msg['text'])
+        # self.items = self.search(unicode(msg['text'])) 
 
         if not len(self.items): 
           self.sender.sendMessage('There is no files searched.')
@@ -268,7 +269,8 @@ class JobMonitor(telepot.helper.Monitor):
     # 완료되지 않은 스케줄을 가져온다. 
     schedule = self.db.uncompletedTvEpisode()
     for episode in schedule:
-      torrents = self.search(unicode(episode['keyword']))
+      torrents = self.search(episode['keyword'])
+      # torrents = self.search(unicode(episode['keyword']))
       if not len(torrents): 
         self.logger.info('can not find tvshow ' + str(episode))
         self.db.increaseTvEpisodeCount(episode['program_id'], episode['download_date'])
@@ -361,12 +363,12 @@ class ChatBox(telepot.DelegatorBot):
     super(ChatBox, self).__init__(token, 
     [
       include_callback_query_chat_id(
-			pave_event_space())(
-				per_chat_id(), create_open, T2bot, self.search, self.db, self.server, timeout=90	
-			), 
+      pave_event_space())(
+        per_chat_id(), create_open, T2bot, self.search, self.db, self.server, timeout=90  
+      ), 
       (per_application(), create_open(JobMonitor, self.search, self.server, self.db)),
     ])
-	
+  
 ########################################################################### 
 
 if __name__ == '__main__':

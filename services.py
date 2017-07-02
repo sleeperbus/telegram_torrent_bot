@@ -27,18 +27,17 @@ def searchFromTorrentKim(keyword, max=10):
     url = domain + '/bbs/s.php?k='+keyword+'&b=&q='
     page = requests.get(url)
     bsObj = BeautifulSoup(page.text, "html.parser")
-    
-    siblings = bsObj.find('table', {'class':'board_list'}).tr.next_sibling
-    for sibling in siblings.findNextSiblings()[1:]:
-        magnet = (sibling.find('a', href=re.compile("^(javascript).*$")))['href'].replace("javascript:Mag_dn('",'').replace("')", '')
-        magnet = "magnet:?xt=urn:btih:"+magnet
-        title = (sibling.find('a', href=re.compile("^(\.\.).*$"))).text.strip()
-        results.append({'title':title, 'magnet':magnet})
+  
+    try:
+      siblings = bsObj.find('table', {'class':'board_list'}).tr.next_sibling
+      for sibling in siblings.findNextSiblings()[1:]:
+          magnet = (sibling.find('a', href=re.compile("^(javascript).*$")))['href'].replace("javascript:Mag_dn('",'').replace("')", '')
+          magnet = "magnet:?xt=urn:btih:"+magnet
+          title = (sibling.find('a', href=re.compile("^(\.\.).*$"))).text.strip()
+          results.append({'title':title, 'magnet':magnet})
 
-    # for sibling in bsObj.find('table', {'class': 'board_list'}).findAll('a', href=re.compile('^(\.\.).*$')):
-    #     title = sibling.text.strip()
-    #     # print(sibling.attrs['href'].replace('..',''))
-    #     magnet = magnetFromPage(sibling.attrs['href'].replace('..',''))
+    except AttributeError as e:
+      print("No data found")
     return results
 
 # feed 상세페이지에서 magnet을 추출한다.

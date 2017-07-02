@@ -71,14 +71,14 @@ class T2bot(telepot.helper.ChatHandler):
   def showTorrentsProgress(self):
     ids = self.db.torrentIds(self.chat_id)
     if len(ids) == 0: 
-      msg = 'There is no torrents downloading ...'
+      msg = '다운 중인 파일이 없습니다.'
       self.sender.sendMessage(msg)
     else:
       info = [self.server.torrentInfoStr(id) for id in ids]
       # only torrent exists in server
       info = [t for t in info if t]
       if len(info) == 0: 
-        self.sender.sendMessage('There is no torrents downloading ...')
+        self.sender.sendMessage('다운 중인 파일이 없습니다.')
       else: self.sender.sendMessage('\n\n'.join(info))
 
   # current torrent files downloaded
@@ -102,22 +102,24 @@ class T2bot(telepot.helper.ChatHandler):
     if content_type == 'text': 
       # command - progress
       if msg['text'] == '/progress':
+        self.logger.debug('/progress')
         self.mode = 'progress'
         self.showTorrentsProgress() 
         return
 
       # command - delete
       elif msg['text'] == '/delete':
+        self.logger.debug('/delete')
         self.mode = 'delete'
         # clear message identifier saved
         if self.savedMsgIdentifier:
           id = telepot.message_identifier(self.savedMsgIdentifier)
           self.bot.editMessageText(id, '...', reply_markup=None)
 
-        self.sender.sendMessage('Select torrent to delete ...')
+        self.sender.sendMessage('삭제할 토렌트를 선택하세요.')
         self.items = self.ongoingList()
         if len(self.items) == 0: 
-          self.sender.sendMessage('There is no downloading files.')
+          self.sender.sendMessage('다운 중인 파일이 없습니다.')
           self.savedMsgIdentifier = None
         else:
           self.showItems(self.items) 
@@ -125,15 +127,16 @@ class T2bot(telepot.helper.ChatHandler):
 
       # command - reboot
       elif msg['text'] == '/reboot':
-        self.logger.debug('user select reboot option')
-        self.sender.sendMessage('Torrent server rebooting ...')
-        self.sender.sendMessage('*** Do not enter message ***')
+        self.logger.debug('/reboot')
+        self.sender.sendMessage('토렌트 서버가 종료됩니다.')
+        self.sender.sendMessage('*** 기다리세요 ***')
         self.server.reboot()
-        self.sender.sendMessage('System ok ...')
+        self.sender.sendMessage('시스템이 정상적으로 기동되었습니다.')
         self.logger.debug('System reboot done ... ')
 
       # command - new tv schedule
       elif '/new_tvshow' in msg['text']:
+        self.logger.debug('/new_tvshow')
         name, weekday, time, start_date, keyword = msg['text'].split(' ')[1].split('|')
         keyword = keyword.replace(',', ' ')
         for day in weekday.split(','):
@@ -142,20 +145,22 @@ class T2bot(telepot.helper.ChatHandler):
 
       # 설정된 tvshow 목록을 확인한다. 
       elif '/close_tvshow' in msg['text']:
+        self.logger.debug('/close_tvshow')
+        self.logger.debug('chat_id is %d' % self.chat_id)
         self.mode = 'close_tvshow'
         if self.savedMsgIdentifier:
           id = telepot.message_identifier(self.savedMsgIdentifier)
           self.bot.editMessageText(id, '...', reply_markup=None)
         self.sender.sendMessage('오늘부터 스케줄링을 하지 않을 티비쇼를 고르세요.')
-        self.logger.debug('chat_id is %d' % self.chat_id)
         self.items = self.db.tvShowList(self.chat_id)
         if len(self.items) == 0:
-          self.sender.sendMessage('활성화된 티비쇼가 없습니다.')
+          self.sender.sendMessage('다운로드 목록이 비어 있습니다.')
           self.savedMsgIdentifier = None
         else:
           self.showItems(self.items)
       # schedule 되어 있는 목록을 확인한다.
       elif '/episodes' in msg['text']:
+        self.logger.debug('/episodes')
         self.mode = 'episodes'
         if self.savedMsgIdentifier:
           id = telepot.message_identifier(self.savedMsgIdentifier)
@@ -172,18 +177,18 @@ class T2bot(telepot.helper.ChatHandler):
       # search torrents file using self.search function
       else: 
         self.mode = 'search'
+        self.logger.debug('search mode')
         if self.savedMsgIdentifier:
           id = telepot.message_identifier(self.savedMsgIdentifier)
           self.bot.editMessageText(id, '...', reply_markup=None)
 
-        self.sender.sendMessage('searching ...') 
-        self.logger.debug('user try to search keyword: %s' % msg['text'])
+        self.sender.sendMessage('검색 중입니다.') 
+        self.logger.debug('유저가 입력한 검색어: %s' % msg['text'])
         self.items = self.search(msg['text'])
-        # self.items = self.search(unicode(msg['text'])) 
 
         if not len(self.items): 
-          self.sender.sendMessage('There is no files searched.')
-          self.logger.debug('can not find any torrent ...')
+          self.sender.sendMessage('관련된 내용을 찾을 수 없습니다.')
+          self.logger.debug('유저의 검색어로 토렌트 파일을 찾을 수 없음')
           self.savedMsgIdentifier = None
         else: 
           self.showItems(self.items)
@@ -204,12 +209,12 @@ class T2bot(telepot.helper.ChatHandler):
 
     if self.mode == 'search':
       torrent = self.items[int(data)]
-      self.bot.editMessageText(id, 'Adding,  %s' % torrent['title'], reply_markup=None)
+      self.bot.editMessageText(id, '%s 추가 완료' % torrent['title'], reply_markup=None)
       self.addTorrent(torrent['magnet'], self.chat_id)
 
     elif self.mode == 'delete': 
       torrent = self.items[int(data)]
-      self.bot.editMessageText(id, 'Deleting, %s' % torrent['title'], reply_markup=None)
+      self.bot.editMessageText(id, '%s 삭제 완료' % torrent['title'], reply_markup=None)
       self.deleteTorrent(torrent['id'])
 
     elif self.mode == 'close_tvshow':
@@ -226,7 +231,7 @@ class T2bot(telepot.helper.ChatHandler):
   def addTorrent(self, magnet, chat_id):
     torrentInfo = self.server.add(magnet) 
     if not torrentInfo:
-      self.sender.sendMessage('Already in list')
+      self.sender.sendMessage('이미 리스트에 있습니다.')
       self.logger.debug('torrent user add is already in deluge, maybe')
       return
 
@@ -300,7 +305,7 @@ class JobMonitor(telepot.helper.Monitor):
 
   # deluged 가 생각보다 잘 뻗기 때문에 process 가 살아있는지 가끔 확인하고
   # 죽어 있으면 되살린다. 
-  def keepAliveTorrentServer():
+  def keepAliveTorrentServer(self):
     if not self.server.isAlive():
       self.logger.warn('Server down, will reboot')
       self.server.reboot()

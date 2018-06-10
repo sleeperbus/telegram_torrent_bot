@@ -22,7 +22,7 @@ from telepot.namedtuple import (
   InlineQueryResultArticle, InlineQueryResultPhoto, 
   InputTextMessageContent 
 )
-from services import searchFromTorrentKim
+from services import searchFromTorrentSite
 from torrentserver import deluge
 from sqlite3 import dbapi2 as sqlite
 from dbserver import dbserver
@@ -386,7 +386,7 @@ if __name__ == '__main__':
     server = deluge()
     db = dbserver('torrent.db')
 
-    bot = ChatBox(TOKEN, searchFromTorrentKim, db, server)
+    bot = ChatBox(TOKEN, searchFromTorrentSite, db, server)
     bot.message_loop(run_forever='Listening...')
 
   except KeyboardInterrupt:

@@ -16,6 +16,7 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import pprint
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 domain_torrenthaja = "https://torrenthaja.com/bbs/"
 
@@ -42,29 +43,51 @@ headers = {'User-Agent':'Mozilla/5.0'}
 #       print("No data found")
 #     return results
 
-def searchFromTorrentSite(keyword, max=10):
+def parseTorrentHaja(keyword, max=10):
   results = []
-  url = domain_torrenthaja + "search.php?search_flag=searchcse&stx="+keyword
+  url = domain_torrenthaja + "search.php?search_flag=search&stx="+keyword
   page = requests.get(url) 
   bsObj = BeautifulSoup(page.text, "html.parser")
+  
   for torrentPage in bsObj.findAll('div', {'class':'td-subject ellipsis'}):
     pageLink = torrentPage.find('a')['href'].replace('./','')
     title = torrentPage.find('a').text 
-    magnet = magnetSubPageTorrentHaja(pageLink)
-    if(magnet):
-      results.append({'title': title, 'magnet':magnet})
+    results.append({'title': title, 'pageLink':pageLink})    
+  
+  return results 
+
+def searchFromTorrentSite(keyword, max=10):
+  print(keyword)
+  results = []
+  items = parseTorrentHaja(keyword)
+    
+  with ThreadPoolExecutor(max_workers=10) as executor:
+    future_to_magnet = {executor.submit(magnetSubPageTorrentHaja, item['pageLink']): item['title'] for item in items}
+    
+    for future in as_completed(future_to_magnet):
+      title = future_to_magnet[future]
+      magnet = future.result()
+      if magnet:
+        results.append({'title':title, 'magnet':magnet})
+  
   return results
+      
 
 # 상세페이지에서 magnet을 추출한다.
 def magnetSubPageTorrentHaja(pageLink):
+    if len(pageLink) == 0:
+      return None
     url = domain_torrenthaja + pageLink
+    print('searching page: {}'.format(url))
     page = requests.get(url)
-    bsObj = BeautifulSoup(page.text, "html.parser")
     try:
+      bsObj = BeautifulSoup(page.text, "html.parser")
+    #try:
       magnet = bsObj.find('button', {'class': 'btn btn-success btn-xs'})['onclick'].replace('magnet_link(','').replace(');','')
       magnet = "magnet:?xt=urn:btih:"+magnet
       return magnet
-    except AttributeError as e:
+    #except AttributeError as e:
+    except:
       return None
 
 

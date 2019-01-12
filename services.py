@@ -1,98 +1,84 @@
-#-*- coding: utf-8 -*-
-# import feedparser
-
-# # 토렌트 검색을 지원하는 사이트
-# def searchFromTorrentKim(keyword, max=10):
-#   url = 'https://torrentkim1.net/bbs/rss.php?k=' 
-#   result = []
-#   d = feedparser.parse(url + keyword) 
-#   for entry in d.entries[0:max]:
-#     result.append({'title': entry.title, 'magnet': entry.link})
-#   return result
-      
-
-# feedparser 로 정상적으로 파싱이 되지 않아 BeautifulSoup 을 사용      
+# -*- coding: utf-8 -*-
 import requests
+from requests.exceptions import ConnectionError
+import logging
+import log
 from bs4 import BeautifulSoup
-import re
-import pprint
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 domain_torrenthaja = "https://torrenthaja.com/bbs/"
+logger = logging.getLogger('torrentbot')
+if not logger:
+    logger = log.setupCustomLogger('torrentbot', './torrentbot.log')
 
-headers = {'User-Agent':'Mozilla/5.0'}
-
-# 검색어 결과를 가져온다.
-
-# def searchFromTorrentKim(keyword, max=10):
-#     results = []
-#     url = domain_torrentkim + '/bbs/s.php?k='+keyword+'&b=&q='
-#     domain_torrenthaja = 
-#     page = requests.get(url)
-#     bsObj = BeautifulSoup(page.text, "html.parser")
-  
-#     try:
-#       siblings = bsObj.find('table', {'class':'board_list'}).tr.next_sibling
-#       for sibling in siblings.findNextSiblings()[1:]:
-#           magnet = (sibling.find('a', href=re.compile("^(javascript).*$")))['href'].replace("javascript:Mag_dn('",'').replace("')", '')
-#           magnet = "magnet:?xt=urn:btih:"+magnet
-#           title = (sibling.find('a', href=re.compile("^(\.\.).*$"))).text.strip()
-#           results.append({'title':title, 'magnet':magnet})
-
-#     except AttributeError as e:
-#       print("No data found")
-#     return results
 
 def parseTorrentHaja(keyword, max=10):
-  results = []
-  url = domain_torrenthaja + "search.php?search_flag=search&stx="+keyword
-  page = requests.get(url) 
-  bsObj = BeautifulSoup(page.text, "html.parser")
-  
-  for torrentPage in bsObj.findAll('div', {'class':'td-subject ellipsis'}):
-    pageLink = torrentPage.find('a')['href'].replace('./','')
-    title = torrentPage.find('a').text 
-    results.append({'title': title, 'pageLink':pageLink})    
-  
-  return results 
+    """
+    토렌트 하자 사이트 파싱
+    """
+    results = []
+    url = domain_torrenthaja + "search.php?search_flag=search&stx=" + keyword
+    page = requests.get(url)
+    bsObj = BeautifulSoup(page.text, "html.parser")
+
+    for torrentPage in bsObj.findAll('div', {'class': 'td-subject ellipsis'}):
+        pageLink = torrentPage.find('a')['href'].replace('./', '')
+        title = torrentPage.find('a').text
+        results.append({'title': title, 'pageLink': pageLink})
+
+    return results
+
 
 def searchFromTorrentSite(keyword, max=10):
-  print(keyword)
-  results = []
-  items = parseTorrentHaja(keyword)
-    
-  with ThreadPoolExecutor(max_workers=10) as executor:
-    future_to_magnet = {executor.submit(magnetSubPageTorrentHaja, item['pageLink']): item['title'] for item in items}
-    
-    for future in as_completed(future_to_magnet):
-      title = future_to_magnet[future]
-      magnet = future.result()
-      if magnet:
-        results.append({'title':title, 'magnet':magnet})
-  
-  return results
-      
+    """
+    외부에 검색을 제공하는 함수
+    """
+    print(keyword)
+    results = []
+    items = parseTorrentHaja(keyword)
 
-# 상세페이지에서 magnet을 추출한다.
+    with ThreadPoolExecutor(max_workers=max) as executor:
+        future_to_magnet = {executor.submit(
+            magnetSubPageTorrentHaja, item['pageLink']): item['title'] for item in items}
+
+        for future in as_completed(future_to_magnet):
+            title = future_to_magnet[future]
+            magnet = future.result()
+            if magnet:
+                results.append({'title': title, 'magnet': magnet})
+
+    return results
+
+
 def magnetSubPageTorrentHaja(pageLink):
+    """
+    토렌트 하자 상세페이지에서 magnet을 추출한다.
+    """
     if len(pageLink) == 0:
-      return None
+        return None
     url = domain_torrenthaja + pageLink
-    print('searching page: {}'.format(url))
-    page = requests.get(url)
-    try:
-      bsObj = BeautifulSoup(page.text, "html.parser")
-    #try:
-      magnet = bsObj.find('button', {'class': 'btn btn-success btn-xs'})['onclick'].replace('magnet_link(','').replace(');','')
-      magnet = "magnet:?xt=urn:btih:"+magnet
-      return magnet
-    #except AttributeError as e:
-    except:
-      return None
 
+    tryCount = 0
+    while tryCount < 2:
+        try:
+            page = requests.get(url)
+        except ConnectionError as E:
+            logger.debug("page connection error: {0}".format(url))
+            tryCount += 1
+        except Exception as E:
+            logger.debug("requests unknow error: {0}".format(E))
+            logger.debug("error class: {0}".format(E.__class__))
+            return None
+        else:
+            tryCount = 10
 
-
-      
-    
-    
-    
+    if page:
+        try:
+            bsObj = BeautifulSoup(page.text, "html.parser")
+            magnet = bsObj.find('button', {'class': 'btn btn-success btn-xs'})[
+                'onclick'].replace('magnet_link(', '').replace(');', '')
+        except Exception as E:
+            print(E)
+            print(E.__class__)
+        else:
+            return "magnet:?xt=urn:btih:" + magnet

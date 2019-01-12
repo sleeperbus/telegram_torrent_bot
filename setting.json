@@ -1,10 +1,10 @@
 {
   "token": {
-    "torrent": "YOUR TELEGRAM TOKEN A",
-    "classify": "YOUR TELEGRAM TOKEN B"
+    "torrent": "227612609:AAEjCVj9SsSaVz0aO-Xi4Uwq0KmgflCKfKc",
+    "classify": "252045013:AAE5hf1Gk0Qb97F2A0R1oCPR0sN67HGqKuU"
   }, 
-  "src_path":  "DIRECTORY PATH",
-  "dest_path": "DIRECTORY PATH",
+  "src_path":  "/home/pi/Videos/torrent-download/completed",
+  "dest_path": "/home/pi/Videos/torrent-download/",
   "base_prob": 0.75,
-  "super_user": 1111111
+  "super_user": 28204859
 }

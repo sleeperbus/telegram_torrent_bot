@@ -29,7 +29,7 @@ def parseTorrentHaja(keyword, max=10):
     return results
 
 
-def searchFromTorrentSite(keyword, max=10):
+def searchFromTorrentSite(keyword, max=5):
     """
     외부에 검색을 제공하는 함수
     """
@@ -57,28 +57,23 @@ def magnetSubPageTorrentHaja(pageLink):
     if len(pageLink) == 0:
         return None
     url = domain_torrenthaja + pageLink
-
     tryCount = 0
-    while tryCount < 2:
+    magnet = None
+    while tryCount < 5:
         try:
             page = requests.get(url)
-        except ConnectionError as E:
-            logger.debug("page connection error: {0}".format(url))
-            tryCount += 1
-        except Exception as E:
-            logger.debug("requests unknow error: {0}".format(E))
-            logger.debug("error class: {0}".format(E.__class__))
-            return None
-        else:
-            tryCount = 10
-
-    if page:
-        try:
             bsObj = BeautifulSoup(page.text, "html.parser")
             magnet = bsObj.find('button', {'class': 'btn btn-success btn-xs'})[
                 'onclick'].replace('magnet_link(', '').replace(');', '')
-        except Exception as E:
-            print(E)
-            print(E.__class__)
+        except ConnectionError as E:
+            logger.debug("page connection error: {0} at retry {1}".format(url, tryCount))
+            tryCount += 1
+        except TypeError as E:
+            magnet = None
+        except AttributeError as e:
+            logger.error("can not find magnet link in page: %s" % url)
+            magnet = None
         else:
-            return "magnet:?xt=urn:btih:" + magnet
+            magnet = "magnet:?xt=urn:btih:" + magnet
+    return magnet
+

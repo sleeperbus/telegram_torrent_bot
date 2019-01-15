@@ -344,7 +344,7 @@ class JobMonitor(telepot.helper.Monitor):
                     updateList.append({'id': dbt['id'], 'chat_id': dbt['chat_id'],
                                        'title': st['title']})
 
-        self.logger.debug(updateList)
+        #self.logger.debug(updateList)
 
         for t in updateList:
             self.bot.sendMessage(t['chat_id'], 'downloaded\n' + t['title'])
